@@ -1,5 +1,8 @@
 
 #include <Wire.h>
+#include <WiFi.h>
+#include <HTTPClient.h>
+#include <ArduinoJson.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
 
@@ -23,6 +26,11 @@
 #define SCREEN_HEIGHT 64 // OLED display_ height, in pixels
 #define LINE_HEIGHT 10
 
+const char* ssid = "DEEP-RD";
+const char* password = "07310731";
+const char* serverURL = "http://192.168.10.39:40015/sensor";
+
+
 // https://randomnerdtutorials.com/esp32-ssd1306-oled-display-arduino-ide/
 // Declaration for an SSD1306 display_ connected to I2C (SDA, SCL pins)
 Adafruit_SSD1306 display_(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
@@ -34,6 +42,13 @@ void setup() {
 
   Serial.begin(115200);
   SetUpDisplay();
+
+  WiFi.begin(ssid, password);
+  Serial.println("WiFi connecting");
+  while(WiFi.status() != WL_CONNECTED) {
+    delay(500);
+  }
+  Serial.println("WiFi connected");
 }
 
 static void CleanLine(size_t line_id) {
@@ -49,7 +64,25 @@ void loop() {
   display_.println(cnt_++);
   display_.display();
 
-  delay(100);
+
+  if(WiFi.status() == WL_CONNECTED) {
+    HTTPClient http;
+    http.begin(serverURL);
+    http.addHeader("Content-Type", "application/json");
+
+    StaticJsonDocument<200> doc;
+    doc["device"] = "esp32_viki";
+    doc["temperature"] = 25;
+    doc["humidity"] = cnt_;
+    String json;
+    serializeJson(doc, json);
+
+    int code = http.POST(json);
+    if (code > 0) Serial.println("Sent data, response: " + String(code));
+    http.end();
+  }
+
+  delay(1000);
 }
 
 void SetUpDisplay() {

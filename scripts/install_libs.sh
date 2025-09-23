@@ -10,6 +10,7 @@ echo "==============================="
 LIBRARIES=(
     "Adafruit GFX Library"
     "Adafruit SSD1306"
+    "ArduinoJson@7.4.2"
 )
 
 for LIB in "${LIBRARIES[@]}"; do

@@ -22,6 +22,7 @@
 
 #define ZE08_CH20_RX_PIN 16   // your actual RX pin
 #define ZE08_CH20_TX_PIN -1   // unused
+#define BOOT_BUTTON_PIN 0  // ESP32 Dev Kit 上 BOOT 按钮通常接 GPIO0
 
 
 #define SCREEN_WIDTH 128 // OLED display_ width, in pixels
@@ -35,6 +36,13 @@ const char* ssid = "DEEP-RD";
 const char* password = "07310731";
 const char* serverURL = "http://192.168.10.39:40015/sensor";
 
+volatile bool bootPressed = false;
+RTC_DATA_ATTR bool deviceOn = true;  // remember state across deep sleep
+
+// 中断服务函数（ISR）
+void IRAM_ATTR bootButtonISR() {
+  bootPressed = true;  // 设置标志位
+}
 
 // https://randomnerdtutorials.com/esp32-ssd1306-oled-display-arduino-ide/
 // Declaration for an SSD1306 display_ connected to I2C (SDA, SCL pins)
@@ -44,6 +52,9 @@ void SetUpDisplay();
 void setup() {
   pinMode(LED_PIN, OUTPUT);
   Serial.begin(115200);
+  pinMode(BOOT_BUTTON_PIN, INPUT_PULLUP); // 按钮一般是低电平按下
+  attachInterrupt(digitalPinToInterrupt(BOOT_BUTTON_PIN), bootButtonISR, FALLING);
+  esp_sleep_enable_ext0_wakeup(GPIO_NUM_0, 0); // wakeup on LOW
 
   // 降到 80MHz（默认是 240MHz）
   setCpuFrequencyMhz(80);
@@ -124,6 +135,21 @@ static void LoopZE08CH2O() {
 // static int last_button_state_ = LOW;
 static int cnt_ = 0;
 void loop() {
+  if (bootPressed) {
+    Serial.println("BOOT button pressed!");
+    bootPressed = false;
+    if (deviceOn) {
+      Serial.println("System Sleep.");
+      // Turn off display
+      display_.clearDisplay();
+      display_.display();
+      display_.ssd1306_command(SSD1306_DISPLAYOFF);
+      Serial.println("Display turned off");
+      esp_deep_sleep_start();
+      deviceOn = false;
+    }
+  }
+
   CleanLine(0);  // clear line
   display_.setCursor(0, 0);
   display_.print("CH2O ");
